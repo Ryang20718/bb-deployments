@@ -1,0 +1,103 @@
+diff --git a/kubernetes/config/common.libsonnet b/docker-compose/config/common.libsonnet
+index 10f6943..fab0328 100644
+--- a/kubernetes/config/common.libsonnet
++++ b/docker-compose/config/common.libsonnet
+@@ -5,11 +5,11 @@
+         hashInitialization: 11946695773637837490,
+         shards: [
+           {
+-            backend: { grpc: { address: 'storage-0.storage.buildbarn:8981' } },
++            backend: { grpc: { address: 'storage-0:8981' } },
+             weight: 1,
+           },
+           {
+-            backend: { grpc: { address: 'storage-1.storage.buildbarn:8981' } },
++            backend: { grpc: { address: 'storage-1:8981' } },
+             weight: 1,
+           },
+         ],
+@@ -22,11 +22,11 @@
+             hashInitialization: 14897363947481274433,
+             shards: [
+               {
+-                backend: { grpc: { address: 'storage-0.storage.buildbarn:8981' } },
++                backend: { grpc: { address: 'storage-0:8981' } },
+                 weight: 1,
+               },
+               {
+-                backend: { grpc: { address: 'storage-1.storage.buildbarn:8981' } },
++                backend: { grpc: { address: 'storage-1:8981' } },
+                 weight: 1,
+               },
+             ],
+@@ -36,12 +36,12 @@
+       },
+     },
+   },
+-  browserUrl: 'http://bb-browser.example.com:80',
++  browserUrl: 'http://localhost:7984',
+   maximumMessageSizeBytes: 2 * 1024 * 1024,
+   global: {
+     diagnosticsHttpServer: {
+       httpServers: [{
+-        listenAddresses: [':9980'],
++        listenAddresses: [':80'],
+         authenticationPolicy: { allow: {} },
+       }],
+       enablePrometheus: true,
+diff --git a/kubernetes/config/runner-ubuntu22-04.jsonnet b/docker-compose/config/runner-ubuntu22-04.jsonnet
+index 7e0103f..7f08b6d 100644
+--- a/kubernetes/config/runner-ubuntu22-04.jsonnet
++++ b/docker-compose/config/runner-ubuntu22-04.jsonnet
+@@ -2,7 +2,7 @@ local common = import 'common.libsonnet';
+ 
+ {
+   buildDirectoryPath: '/worker/build',
+-  // TODO: global: common.global,
++  global: common.global,
+   grpcServers: [{
+     listenPaths: ['/worker/runner'],
+     authenticationPolicy: { allow: {} },
+diff --git a/kubernetes/config/worker-ubuntu22-04.jsonnet b/docker-compose/config/worker-hardlinking-ubuntu22-04.jsonnet
+index 50cabe5..ab10376 100644
+--- a/kubernetes/config/worker-ubuntu22-04.jsonnet
++++ b/docker-compose/config/worker-hardlinking-ubuntu22-04.jsonnet
+@@ -1,13 +1,14 @@
+ local common = import 'common.libsonnet';
+ 
++// DO NOT USE the hardlinking configuration below unless really needed.
++// This example only exists for reference in situations
++// where the more efficient FUSE worker is not supported.
+ {
+   blobstore: common.blobstore,
+   browserUrl: common.browserUrl,
+   maximumMessageSizeBytes: common.maximumMessageSizeBytes,
+   scheduler: { address: 'scheduler:8983' },
+-  global: common.global {
+-    setUmask: { umask: 0 },
+-  },
++  global: common.global,
+   buildDirectories: [{
+     native: {
+       buildDirectoryPath: '/worker/build',
+@@ -19,6 +20,7 @@ local common = import 'common.libsonnet';
+     runners: [{
+       endpoint: { address: 'unix:///worker/runner' },
+       concurrency: 8,
++      instanceNamePrefix: 'hardlinking',
+       platform: {
+         properties: [
+           { name: 'OSFamily', value: 'linux' },
+@@ -26,8 +28,10 @@ local common = import 'common.libsonnet';
+         ],
+       },
+       workerId: {
+-        pod: std.extVar('POD_NAME'),
+-        node: std.extVar('NODE_NAME'),
++        datacenter: 'linkoping',
++        rack: '4',
++        slot: '15',
++        hostname: 'ubuntu-worker.example.com',
+       },
+     }],
+   }],
